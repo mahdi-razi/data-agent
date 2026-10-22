@@ -1,7 +1,7 @@
 import os
 from langchain_ollama import ChatOllama
 from langgraph.graph import MessagesState, StateGraph, START
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.prebuilt import ToolNode, tools_condition
 from tools import get_schema, load_query, run_python
@@ -9,6 +9,7 @@ from prompts import SYSTEM_PROMPT
 
 
 MODEL = "gemma4:12b"
+CHECKPOINT_DATABASE_URL = os.environ["CHECKPOINT_DATABASE_URL"]
 
 
 def build_graph(llm, checkpointer):
@@ -30,22 +31,37 @@ def build_graph(llm, checkpointer):
     return graph.compile(checkpointer=checkpointer)
 
 
-def main():
-    llm = ChatOllama(model=MODEL, temperature=0)
-    graph = build_graph(llm, MemorySaver())
-    config = {"configurable": {"thread_id": "default"}}
-
-    print("Ctrl+C to quit.")
+def ask_project_name():
     while True:
-        try:
-            user_text = input("\nyou> ").strip()
-        except (KeyboardInterrupt, EOFError):
-            break
-        if not user_text:
-            continue
+        name = input("project name> ").strip().lower()
+        if name and name.replace("_", "").replace("-", "").isalnum():
+            return name
+        print("Use only letters, digits, - and _.")
 
-        result = graph.invoke({"messages": [HumanMessage(user_text)]}, config)
-        print("\nagent>", result["messages"][-1].content)
+
+def main():
+    with PostgresSaver.from_conn_string(CHECKPOINT_DATABASE_URL) as checkpointer:
+        checkpointer.setup()
+        llm = ChatOllama(model=MODEL, temperature=0)
+        graph = build_graph(llm, checkpointer)
+
+        try:
+            project = ask_project_name()
+        except (KeyboardInterrupt, EOFError):
+            return
+        config = {"configurable": {"thread_id": project}}
+
+        print(f"Project: {project}. Ctrl+C to quit.")
+        while True:
+            try:
+                user_text = input("\nyou> ").strip()
+            except (KeyboardInterrupt, EOFError):
+                break
+            if not user_text:
+                continue
+
+            for state in graph.stream({"messages": [HumanMessage(user_text)]}, config, stream_mode="values"):
+                state["messages"][-1].pretty_print()
 
 
 if __name__ == "__main__":
