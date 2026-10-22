@@ -1,0 +1,59 @@
+import contextlib
+import glob
+import io
+import json
+import os
+import sys
+from functools import partial
+import traceback
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from scipy import stats
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from charts import save_chart
+
+WORK = "/work"
+
+namespace = {
+    "pd": pd,
+    "np": np,
+    "stats": stats,
+    "sm": sm,
+    "smf": smf,
+    "px": px,
+    "go": go,
+    "save_chart": partial(save_chart, folder=WORK),
+}
+
+os.chdir(WORK)
+
+
+def load_all_files():
+    for path in glob.glob(os.path.join(WORK, "*.parquet")):
+        name = os.path.splitext(os.path.basename(path))[0]
+        namespace[name] = pd.read_parquet(path)
+
+
+def run(code):
+    output = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(output):
+            exec(code, namespace)
+    except Exception:
+        return output.getvalue() + traceback.format_exc()
+    return output.getvalue() or "(no output)"
+
+
+def main():
+    for line in sys.stdin:
+        code = json.loads(line)["code"]
+        load_all_files()
+        print(json.dumps({"output": run(code)}), flush=True)
+
+
+if __name__ == "__main__":
+    main()
