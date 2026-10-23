@@ -15,6 +15,7 @@ CAP = 100_000
 TIMEOUT = 60
 RESERVED = {"pd", "np", "stats", "sm", "smf", "px", "go", "save_chart", "save_dashboard"}
 MAX_OUTPUT = 5000
+SKILLS_DIR = os.path.join(os.path.dirname(__file__), "skills")
 
 sandboxes = {}
 
@@ -256,3 +257,20 @@ def profiler(name: str, config: RunnableConfig) -> str:
     }
 
     return json.dumps(report, ensure_ascii=False)
+
+
+@tool
+def load_skill(name: str) -> str:
+    """
+    Load the exact rules and code recipes for a task. You must call it first, before any other tool, if the request is related to one of the following skills.
+    Skills:
+    - charts: for any chart, plot or visualization: line, bar, histogram, box plot, scatter, heatmap, pie
+    - statistics: for differs, related, associated, drives, significant, p-value, test, correlation, regression, confidence interval, trends
+    - dashboards: for dashboard, KPIs, scorecard (also load charts)
+    One call per required skills.
+    """
+    available = sorted(f[:-3] for f in os.listdir(SKILLS_DIR) if f.endswith(".md"))
+    if name not in available:
+        return f"Error: unknown skill '{name}'. Available: {', '.join(available)}"
+    with open(os.path.join(SKILLS_DIR, name + ".md"), encoding="utf-8") as file:
+        return file.read()

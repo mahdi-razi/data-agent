@@ -5,7 +5,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from langchain_core.messages import HumanMessage, SystemMessage, trim_messages
 from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.prebuilt import ToolNode, tools_condition
-from tools import get_schema, load_query, run_python, profiler
+from tools import get_schema, load_query, run_python, profiler, load_skill
 from prompts import SYSTEM_PROMPT
 from langgraph.errors import GraphRecursionError
 
@@ -18,7 +18,7 @@ CHECKPOINT_DATABASE_URL = os.environ["CHECKPOINT_DATABASE_URL"]
 
 
 def build_graph(llm, checkpointer):
-    tools = [get_schema, load_query, profiler, run_python]
+    tools = [get_schema, load_query, profiler, run_python, load_skill]
     llm_with_tools = llm.bind_tools(tools)
 
     def assistant(state: MessagesState):
