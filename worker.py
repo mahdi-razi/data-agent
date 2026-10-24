@@ -50,7 +50,7 @@ def run(code):
         with contextlib.redirect_stdout(output):
             exec(code, namespace)
     except Exception:
-        return f"{output.getvalue()}{traceback.format_exc()}"
+        return f"{output.getvalue()}{traceback.format_exc(limit=-3)}"
     text = output.getvalue() or "(no output)"
     return text
 
